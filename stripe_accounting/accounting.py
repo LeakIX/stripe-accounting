@@ -3,7 +3,7 @@ import logging
 import os
 import pathlib
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Dict
 from prettytable import PrettyTable
 
 import decouple
@@ -252,7 +252,9 @@ class Payout:
         return self.raw["id"]
 
     @classmethod
-    def retrieve(cls, from_datetime: datetime.datetime, until_datetime: datetime.datetime):
+    def retrieve(
+        cls, from_datetime: datetime.datetime, until_datetime: datetime.datetime
+    ):
         has_more = True
         starting_after = None
         payouts = []
@@ -314,7 +316,9 @@ class Refund:
         return self.payment.invoice
 
     @classmethod
-    def retrieve(cls, from_datetime: datetime.datetime, until_datetime: datetime.datetime):
+    def retrieve(
+        cls, from_datetime: datetime.datetime, until_datetime: datetime.datetime
+    ):
         refunds = []
         has_more = True
         starting_after = None
@@ -402,7 +406,7 @@ class TaxRate:
 
 
 class TaxRateCache:
-    CACHE = {}
+    CACHE: Dict[str, TaxRate] = {}
 
     def get(self, tax_rate_id):
         if tax_rate_id in self.CACHE:
@@ -841,10 +845,10 @@ class Invoice:
     @classmethod
     def retrieve_by_number(cls, number: str):
         query = f"number:'{number}'"
-        invoice = stripe.Invoice.search(query=query, limit=100)
-        if invoice is None:
+        raw_invoice = stripe.Invoice.search(query=query, limit=100)
+        if raw_invoice is None:
             logging.error(f"No invoice with number {number} found")
-        invoice = cls(invoice["data"][0])
+        invoice = cls(raw_invoice["data"][0])
         return invoice
 
     @classmethod
@@ -872,24 +876,26 @@ class Invoice:
 
 class StripeAPI:
     def download_invoices(self, from_datetime: str, until_datetime: str):
-        from_datetime = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
-        until_datetime = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
-        from_datetime = from_datetime.replace(hour=0, minute=0, second=0)
-        until_datetime = until_datetime.replace(hour=0, minute=0, second=0)
-        invoices = Invoice.retrieve(from_datetime, until_datetime)
+        from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
+        until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
+        from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=0, minute=0, second=0)
+        invoices = Invoice.retrieve(
+            from_datetime=from_datetime_dt, until_datetime=until_datetime_dt
+        )
         logging.info(
             "Retrieved %d invoices between %s and %s"
-            % (len(invoices), from_datetime, until_datetime)
+            % (len(invoices), from_datetime_dt, until_datetime_dt)
         )
         for i in invoices:
             i.download()
 
     def print_payouts(self, from_datetime: str, until_datetime: str):
-        from_datetime = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
-        until_datetime = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
-        from_datetime = from_datetime.replace(hour=0, minute=0, second=0)
-        until_datetime = until_datetime.replace(hour=0, minute=0, second=0)
-        payouts = Payout.retrieve(from_datetime, until_datetime)
+        from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
+        until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
+        from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=0, minute=0, second=0)
+        payouts = Payout.retrieve(from_datetime_dt, until_datetime_dt)
         items = payouts[0].items
         table = PrettyTable()
         table.field_names = [
@@ -939,12 +945,12 @@ class StripeAPI:
         print(table)
 
     def compute_vat_per_country(self, from_datetime, until_datetime):
-        from_datetime = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
-        until_datetime = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
-        from_datetime = from_datetime.replace(hour=0, minute=0, second=0)
-        until_datetime = until_datetime.replace(hour=0, minute=0, second=0)
+        from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
+        until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
+        from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=0, minute=0, second=0)
         all_invoices = Invoice.retrieve(
-            from_datetime=from_datetime, until_datetime=until_datetime
+            from_datetime=from_datetime_dt, until_datetime=until_datetime_dt
         )
         paid_invoices = [i for i in all_invoices if i.is_paid() and i.is_taxable()]
         paid_invoices_per_country = {}
@@ -990,7 +996,7 @@ class StripeAPI:
             return
         invoice = Invoice.retrieve_by_id(invoice_number)
         logging.info(f"Processing invoice {invoice.number}")
-        issued_date_credit_note = datetime.datetime.strptime(
+        issued_date_credit_note_dt = datetime.datetime.strptime(
             issued_date_credit_note, "%Y-%m-%d"
         )
         # 1 --> 0001
@@ -1007,12 +1013,12 @@ class StripeAPI:
         #   Year    |       1 if OSS, else no (always 1 in our case as we use Stripe)
         #           |
         #      Currency index (00 = EUR, 01 = USD, etc)
-        year = str(issued_date_credit_note.year)[2:]
-        credit_note_number = f"S{year}{currency_index_str}1-{index_cn_str}"
+        year = str(issued_date_credit_note_dt.year)[2:]
+        credit_note_number_str = f"S{year}{currency_index_str}1-{index_cn_str}"
         made_up_credit_note = MadeUpCreditNote(
-            credit_note_number=credit_note_number,
+            credit_note_number=credit_note_number_str,
             invoice_number=invoice.number,
-            issue_date_credit_note=issued_date_credit_note,
+            issue_date_credit_note=issued_date_credit_note_dt,
             customer=invoice.customer,
             subtotal_tax=invoice.tax,
             tax_rate=invoice.tax_rate,
@@ -1023,8 +1029,8 @@ class StripeAPI:
             adjustment_applied_to_invoice=invoice.total,
         )
         cn = made_up_credit_note.generate()
-        issue_date_credit_note_str = issued_date_credit_note.strftime("%Y%m%d")
-        filename = f"{issue_date_credit_note_str}-CN-{credit_note_number}-INVOICE-{made_up_credit_note.invoice_number}"
+        issue_date_credit_note_str = issued_date_credit_note_dt.strftime("%Y%m%d")
+        filename = f"{issue_date_credit_note_str}-CN-{credit_note_number_str}-INVOICE-{made_up_credit_note.invoice_number}"
         html_filename = f"{CN_HTML_OUTPUT_DIRECTORY}/{filename}.html"
         pdf_filename = f"{CN_PDF_OUTPUT_DIRECTORY}/{filename}.pdf"
         with open(html_filename, "w") as f:
@@ -1059,40 +1065,42 @@ class StripeAPI:
           might have forgotten to emit a credit note when refunding.
         - include lost disputes
         """
-        from_datetime = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
-        until_datetime = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
-        from_datetime = from_datetime.replace(hour=0, minute=0, second=0)
-        until_datetime = until_datetime.replace(hour=0, minute=0, second=0)
+        from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
+        until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
+        from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=0, minute=0, second=0)
         currency = CURRENCIES.get(currency_iso_code.upper())
         if currency is None:
             logging.error(f"Currency {currency_iso_code} is not supported")
             return
         # First we get the invoices which we emitted a credit note for through the Stripe interface.
-        stripe_emitted_credit_notes = CreditNote.retrieve(from_datetime, until_datetime)
+        stripe_emitted_credit_notes = CreditNote.retrieve(
+            from_datetime_dt, until_datetime_dt
+        )
         invoices_cn_emitted_stripe = [
             Invoice.retrieve_by_id(cn.invoice_id) for cn in stripe_emitted_credit_notes
         ]
         # Second, we get the refunds. Normally there should be a credit note for all refunds, but we might have
         # forgotten to emit one.
-        refunds = Refund.retrieve(from_datetime, until_datetime)
+        refunds = Refund.retrieve(from_datetime_dt, until_datetime_dt)
         refunded_invoices = [r.invoice for r in refunds]
         # Third, we include disputes
-        disputes = Dispute.retrieve(from_datetime, until_datetime)
+        disputes = Dispute.retrieve(from_datetime_dt, until_datetime_dt)
         disputes_invoices = [d.invoice for d in disputes]
         # Now, we get the open and voided invoices. Normally, there shouldn't be any intersection with the stripe
         # emitted credit notes as Stripe does not allow to emit credit note for these invoices on the interface nor the
         # API.
         include_open = include_open != 0
-        skipping_invoices = (
+        skipping_invoices_list = (
             [] if skipping_invoices is None else skipping_invoices.split(",")
         )
         logging.info(f"Skipping invoices {skipping_invoices}")
-        invoices = Invoice.retrieve(from_datetime, until_datetime)
+        invoices = Invoice.retrieve(from_datetime_dt, until_datetime_dt)
         void_invoices = [
             d
             for d in invoices
             if (d.is_void() or d.is_uncollectible() or (d.is_open() and include_open))
-            and d.number not in skipping_invoices
+            and d.number not in skipping_invoices_list
             and d.currency == currency
         ]
         invoices_to_emit_cn = (
@@ -1105,10 +1113,10 @@ class StripeAPI:
         # Order by invoice number.
         invoices_to_emit_cn.sort(key=lambda i: i.number)
         # take the year of the issued credit note date
-        issued_date_credit_note = datetime.datetime.strptime(
+        issued_date_credit_note_dt = datetime.datetime.strptime(
             issued_date_credit_note, "%Y-%m-%d"
         )
-        year = str(issued_date_credit_note.year)[2:]
+        year = str(issued_date_credit_note_dt.year)[2:]
         first_index_cn = int(first_index_cn)
         index_cn = first_index_cn
         logging.info(f"First index for the credit note will be {index_cn}")
@@ -1130,7 +1138,7 @@ class StripeAPI:
             made_up_credit_note = MadeUpCreditNote(
                 credit_note_number=credit_note_number,
                 invoice_number=invoice.number,
-                issue_date_credit_note=issued_date_credit_note,
+                issue_date_credit_note=issued_date_credit_note_dt,
                 customer=invoice.customer,
                 subtotal_tax=invoice.tax,
                 tax_rate=invoice.tax_rate,
@@ -1141,7 +1149,7 @@ class StripeAPI:
                 adjustment_applied_to_invoice=invoice.total,
             )
             cn = made_up_credit_note.generate()
-            issue_date_credit_note_str = issued_date_credit_note.strftime("%Y%m%d")
+            issue_date_credit_note_str = issued_date_credit_note_dt.strftime("%Y%m%d")
             filename = f"{issue_date_credit_note_str}-CN-{credit_note_number}-INVOICE-{made_up_credit_note.invoice_number}"
             html_filename = f"{CN_HTML_OUTPUT_DIRECTORY}/{filename}.html"
             pdf_filename = f"{CN_PDF_OUTPUT_DIRECTORY}/{filename}.pdf"

@@ -8,9 +8,11 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.9"
 stripe = "*"
+types-stripe = "*"
 python-decouple = "*"
 python-lsp-server = {extras = ["all"], version = "^1.5.0"}
 python-dateutil = "*"
+types-python-dateutil = "*"
 wget = "*"
 fire = "*"
 pycountry = "*"
@@ -20,6 +22,7 @@ prettytable = "*"
 [tool.poetry.dev-dependencies]
 black = "*"
 pytest = "*"
+mypy = "*"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
