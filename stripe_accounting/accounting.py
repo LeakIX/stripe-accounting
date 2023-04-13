@@ -252,7 +252,7 @@ class Payout:
         return self.raw["id"]
 
     @classmethod
-    def retrieve(cls, from_datetime, until_datetime):
+    def retrieve(cls, from_datetime: datetime.datetime, until_datetime: datetime.datetime):
         has_more = True
         starting_after = None
         payouts = []
@@ -314,7 +314,7 @@ class Refund:
         return self.payment.invoice
 
     @classmethod
-    def retrieve(cls, from_datetime, until_datetime):
+    def retrieve(cls, from_datetime: datetime.datetime, until_datetime: datetime.datetime):
         refunds = []
         has_more = True
         starting_after = None
