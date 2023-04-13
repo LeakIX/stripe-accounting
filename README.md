@@ -18,17 +18,18 @@ Feel free to open an issue with your business requirements.
 
 The repository is experimental and may contain some LeakIX specific business requirements.
 
-## Install
+## Setup
 
+Install python dependencies
 ```
 poetry install
 ```
 
-## Environment variables
+### Environment variables
 
 Some configuration is required. Create a file `.env` based on `template.env`.
 
-## CLI utilities
+## CLI
 
 ### Download all invoices between two dates
 
