@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "stripe-accounting"
+version = "1.0.0"
+description = "Accounting helpers for Stripe"
+authors = ["LeakIX <support@leakix.net>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+stripe = "*"
+python-decouple = "*"
+python-lsp-server = {extras = ["all"], version = "^1.5.0"}
+python-dateutil = "*"
+wget = "*"
+fire = "*"
+pycountry = "*"
+jinja2 = "*"
+prettytable = "*"
+
+[tool.poetry.dev-dependencies]
+black = "*"
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[flake8]
+max-line-length = 120

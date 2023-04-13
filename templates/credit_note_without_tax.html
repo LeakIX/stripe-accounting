@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>{{ company_name }} - Credit Note</title>
+
+		<style>
+			.invoice-box {
+				max-width: 1000px;
+				margin: auto;
+				padding: 30px;
+				border: 1px solid #eee;
+				box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+				font-size: 16px;
+				line-height: 24px;
+				font-family: 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif;
+				color: #555;
+			}
+
+      .bolded {
+        font-weight: bold;
+      }
+
+			.invoice-box table {
+				width: 100%;
+				line-height: inherit;
+				text-align: left;
+			}
+
+			.invoice-box table td {
+				padding: 5px;
+				vertical-align: top;
+			}
+
+			.invoice-box table tr td:nth-child(2) {
+				text-align: right;
+			}
+
+			.invoice-box table tr.top table td {
+				padding-bottom: 20px;
+			}
+
+			.invoice-box table tr.top table td.title {
+				font-size: 45px;
+				line-height: 45px;
+				color: #333;
+			}
+
+			.invoice-box table tr.information table td {
+				padding-bottom: 40px;
+			}
+
+			.invoice-box table tr.heading td {
+				background: #eee;
+				border-bottom: 1px solid #ddd;
+				font-weight: bold;
+			}
+
+			.invoice-box table tr.details td {
+				padding-bottom: 20px;
+			}
+
+			.invoice-box table tr.item td {
+				border-bottom: 1px solid #eee;
+			}
+
+			.invoice-box table tr.item.last td {
+				border-bottom: none;
+			}
+
+			.invoice-box table tr.total td:nth-child(2) {
+				border-top: 2px solid #eee;
+				font-weight: bold;
+			}
+
+			@media only screen and (max-width: 600px) {
+				.invoice-box table tr.top table td {
+					width: 100%;
+					display: block;
+					text-align: center;
+				}
+
+				.invoice-box table tr.information table td {
+					width: 100%;
+					display: block;
+					text-align: center;
+				}
+			}
+
+			/** RTL **/
+			.invoice-box.rtl {
+				direction: rtl;
+				font-family: Tahoma, 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif;
+			}
+
+			.invoice-box.rtl table {
+				text-align: right;
+			}
+
+			.invoice-box.rtl table tr td:nth-child(2) {
+				text-align: left;
+			}
+
+     .align-left {
+         text-align: left;
+     }
+
+     .align-right {
+         text-align: right;
+     }
+
+     /* Import from simple-grid.css. Changing % to px */
+     .container {
+         width: 900px;
+         margin-left: auto;
+         margin-right: auto;
+     }
+
+     .row {
+         position: relative;
+         width: 100%;
+     }
+
+     .row [class^="col"] {
+         float: left;
+         margin: 0.5rem 2%;
+         min-height: 0.125rem;
+     }
+
+     .row::after {
+	       content: "";
+	       display: table;
+	       clear: both;
+     }
+
+     .col-3 {
+         width: 189px;
+     }
+
+     .col-6 {
+         width: 414px;
+     }
+
+
+		</style>
+    <!-- <link rel="stylesheet" href="{{ template_directory }}/simple-grid.css"> -->
+	</head>
+
+	<body>
+		<div class="invoice-box">
+			<div class="container">
+          <div class="row">
+              <div class="col-6 align-left">
+									<h1>Credit note</h1>
+                      <div class="col-3 align-left">
+                          <span class="bolded">Credit Note</span><br />
+                          <span class="bolded">Invoice</span><br />
+                          <span class="bolded">Date of issue</span><br />
+                      </div>
+                      <div class="col-3 align-right">
+                          <span class="bolded">{{ credit_note_number }}</span><br />
+                          <span class="bolded">{{ invoice_number }}</span><br />
+                          <span class="bolded">{{ issue_date_credit_note }}</span><br />
+                      </div>
+              </div>
+
+              <div class="col-6 align-right">
+                  <h1>
+									    <img src="{{ template_directory }}/logo.png" alt="logo" style="width: 100%; max-width: 300px" />
+                  </h1>
+              </div>
+          </div>
+				  <div class="row">
+              <div class="col-6 align-left">
+  							  <span class="bolded">{{ company_name }}</span><br />
+								  {{ company_address_line_1 }}<br />
+                  {{ company_address_line_2 }}<br />
+								  {{ company_address_postal_code }}, {{ company_address_city }}<br />
+                  {{ company_address_country }}<br />
+                  {{ company_email }}<br />
+                  VAT {{ company_vat_number }}<br />
+              </div>
+              <div class="col-6 align-right">
+                  <span class="bolded">Bill to</span><br >
+									{{ customer_name }}<br />
+									{{ customer_address_line_1 }}<br />
+                  {{ customer_address_line_2 }}<br />
+                  {{ customer_address_postal_code }} {{ customer_address_city }}<br />
+                  {{ customer_address_country }}<br />
+                  {{ customer_email }}<br />
+									{{ customer_vat }}<br />
+              </div>
+          </div>
+			    <h2>{{ amount }} credited on {{ issue_date_credit_note }}</h2>
+			    <table aria-description="box-products" >
+				      <tr class="heading">
+					        <td>Description</td>
+					        <td>Qty</td>
+					        <td>Unit price (excl. tax)</td>
+					        <td>Amount (excl. tax)</td>
+				      </tr>
+              {% for product in products %}
+  				    <tr class="details">
+  					      <td>{{ product.description }}</td>
+  					      <td>{{ product.quantity }}</td>
+  					      <td>{{ product.unit_price_excl_tax }}</td>
+  					<td>{{ product.amount_excl_tax }}</td>
+  				</tr>
+        {% endfor %}
+
+				<tr class="details">
+					<td></td>
+					<td></td>
+					<td>Subtotal</td>
+					<td>{{ subtotal }}</td>
+				</tr>
+
+				<tr class="details">
+					<td></td>
+					<td></td>
+					<td>{{ subtotal_tax }}</td>
+				</tr>
+				<tr class="details">
+					<td></td>
+					<td></td>
+					<td><span class="bolded">Adjustment total</span></td>
+					<td><span class="bolded">{{ total_adjustment_amount }}</span></td>
+				</tr>
+				<tr class="details">
+					<td></td>
+					<td></td>
+					<td><span class="bolded">Adjustment applied to invoice</span></td>
+					<td><span class="bolded">-{{ adjustment_applied_to_invoice }}</span></td>
+				</tr>
+			</table>
+			<p>
+				For registered companies outside of the EU: exempt from VAT, Article 39 Service export
+			</p>
+			<p>
+				For registered companies in EU except {{ company_address_country }}: exempt from VAT, Art 21 $ 2, reverse charges (auto-liquidation)
+			</p>
+          </div>
+   		</div>
+	</body>
+</html>
