@@ -34,7 +34,11 @@ Some configuration is required. Create a file `.env` based on `template.env`.
 ### Download all invoices between two dates
 
 ```
-poetry run python stripe_accounting/accounting.py download-invoices --from-datetime 2023-03-01 --until-datetime 2023-03-31
+poetry run python \
+  stripe_accounting/accounting.py \
+  download-invoices \
+  --from-datetime 2023-03-01 \
+  --until-datetime 2023-03-31
 ```
 
 Files will be available in `DOWNLOAD_DIRECTORY`, see `template.env`
