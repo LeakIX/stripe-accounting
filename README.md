@@ -1,4 +1,4 @@
-Acounting helpers for Stripe
+Accounting helpers for Stripe
 ===================================
 
 Millions of businesses of all sizes—from startups to large enterprises—use
