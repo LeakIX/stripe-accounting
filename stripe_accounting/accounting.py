@@ -83,7 +83,7 @@ class Price:
         elif len(l) == 1:
             return l[0]
         currency = l[0].currency
-        s = cls(q=Decimal("0"), currency=currency)
+        s = cls(q=Decimal(l[0].q), currency=currency)
         tl = l[1:]
         for i in tl:
             s += i
