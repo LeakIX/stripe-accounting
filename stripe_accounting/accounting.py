@@ -207,10 +207,13 @@ class PayoutItem:
 
     @property
     def related_accounting_account(self):
-        if self.related_invoice.customer_address.country_code not in INTRACOM_COUNTRY_CODES:
-            return "OSS EXTRACOM"
+        if not self.related_invoice.customer.is_b2b():
+            if self.related_invoice.customer_address.country_code not in INTRACOM_COUNTRY_CODES:
+                return "OSS EXTRACOM"
+            else:
+                return "OSS %s" % self.related_invoice.customer_address.country
         else:
-            return "OSS %s" % self.related_invoice.customer_address.country
+            return "%s" % self.related_invoice.customer_name
 
 
 class Payout:
