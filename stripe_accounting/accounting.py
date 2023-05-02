@@ -1100,7 +1100,6 @@ class StripeAPI:
             d
             for d in invoices
             if (d.is_void() or d.is_uncollectible() or (d.is_open() and include_open))
-            and d.number not in skipping_invoices_list
             and d.currency == currency
         ]
         invoices_to_emit_cn = (
@@ -1112,6 +1111,7 @@ class StripeAPI:
                 invoices_to_emit_cn.append(i)
         # Order by invoice number.
         invoices_to_emit_cn.sort(key=lambda i: i.number)
+        invoices_to_emit_cn = [d for d in invoices_to_emit_cn if d.number not in skipping_invoices_list]
         # take the year of the issued credit note date
         issued_date_credit_note_dt = datetime.datetime.strptime(
             issued_date_credit_note, "%Y-%m-%d"
