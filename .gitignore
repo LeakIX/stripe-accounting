@@ -130,3 +130,5 @@ dmypy.json
 cn-html
 cn-pdf
 download
+*.csv
+*~lock*
