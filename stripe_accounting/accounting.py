@@ -11,7 +11,7 @@ import fire
 import pycountry
 import stripe
 import wget
-from dateutil.relativedelta import relativedelta
+import csv
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -23,6 +23,11 @@ DOWNLOAD_DIRECTORY = pathlib.Path(decouple.config("DOWNLOAD_DIRECTORY"))
 TEMPLATE_DIRECTORY = PWD / "templates"
 CN_HTML_OUTPUT_DIRECTORY = pathlib.Path(decouple.config("CN_HTML_OUTPUT_DIRECTORY"))
 CN_PDF_OUTPUT_DIRECTORY = pathlib.Path(decouple.config("CN_PDF_OUTPUT_DIRECTORY"))
+
+# From https://www.destatis.de/Europa/EN/Country/Country-Codes.html
+INTRACOM_COUNTRY_CODES = [
+    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LT", "LV", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "CH"
+]
 
 
 def create_directories():
@@ -200,6 +205,13 @@ class PayoutItem:
         q = gross_amount - net_amount
         return Price(currency=self.currency, q=q)
 
+    @property
+    def related_accounting_account(self):
+        if self.related_invoice.customer_address.country_code not in INTRACOM_COUNTRY_CODES:
+            return "OSS EXTRACOM"
+        else:
+            return "OSS %s" % self.related_invoice.customer_address.country
+
 
 class Payout:
     def __init__(self, raw: dict):
@@ -268,6 +280,54 @@ class Payout:
         return [
             r for r in payouts if from_datetime <= r.created_datetime <= until_datetime
         ]
+
+    def as_prettytable(self):
+        items = self.items
+        table = PrettyTable()
+        table.field_names = [
+            "description",
+            "type",
+            "Gross amount",
+            "Net amount",
+            "Fee amount",
+            "Datetime",
+            "Related invoice",
+            "Client email",
+            "Client country",
+            "Related OSS accounting account"
+        ]
+        for i in items:
+            if i.related_invoice is not None:
+                table.add_row(
+                    [
+                        i.description,
+                        i.item_type,
+                        i.gross_amount,
+                        i.net_amount,
+                        i.fee_amount,
+                        i.created_datetime,
+                        i.related_invoice.number,
+                        i.related_invoice.customer.email,
+                        i.related_invoice.customer.address.country,
+                        i.related_accounting_account,
+                    ]
+                )
+            else:
+                table.add_row(
+                    [
+                        i.description,
+                        i.item_type,
+                        i.gross_amount,
+                        i.net_amount,
+                        i.fee_amount,
+                        i.created_datetime,
+                        "",
+                        "",
+                        "",
+                        ""
+                    ]
+                )
+        return table
 
 
 class Payment:
@@ -895,54 +955,41 @@ class StripeAPI:
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
         until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
-        payouts = Payout.retrieve(from_datetime_dt, until_datetime_dt)
-        items = payouts[0].items
-        table = PrettyTable()
-        table.field_names = [
-            "description",
-            "type",
-            "Gross amount",
-            "Net amount",
-            "Fee amount",
-            "Datetime",
-            "Related invoice",
-            "Client email",
-            "Client country",
-        ]
-        for i in items:
-            if i.related_invoice is not None:
-                table.add_row(
-                    [
-                        i.description,
-                        i.item_type,
-                        i.gross_amount,
-                        i.net_amount,
-                        i.fee_amount,
-                        i.created_datetime,
-                        i.related_invoice.number,
-                        i.related_invoice.customer.email,
-                        i.related_invoice.customer.address.country,
-                    ]
-                )
-            else:
-                table.add_row(
-                    [
-                        i.description,
-                        i.item_type,
-                        i.gross_amount,
-                        i.net_amount,
-                        i.fee_amount,
-                        i.created_datetime,
-                        None,
-                        None,
-                        None,
-                    ]
-                )
-        print(
-            "Payout ID %s, executed on %s"
-            % (payouts[0].payout_id, payouts[0].created_datetime)
-        )
-        print(table)
+        payouts = Payout.retrieve(from_datetime=from_datetime_dt, until_datetime=until_datetime_dt)
+        logging.info("Retrieved %d payouts", len(payouts))
+        for payout in payouts:
+            table = payout.as_prettytable()
+            print(
+                "Payout ID %s, executed on %s"
+                % (payout.payout_id, payout.created_datetime)
+            )
+            print(table)
+
+    def export_payouts_as_csv(self, from_datetime: str, until_datetime: str):
+        from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
+        until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
+        from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
+        payouts = Payout.retrieve(from_datetime=from_datetime_dt, until_datetime=until_datetime_dt)
+        logging.info("Retrieved %d payouts", len(payouts))
+        kwargs = {"delimiter": "\t"}
+
+        for payout in payouts:
+            table = payout.as_prettytable()
+            options = table._get_options(kwargs)
+            csv_options = {
+                key: value for key, value in kwargs.items() if key not in options
+            }
+            payout_date = payout.created_datetime.strftime("%Y%m%d")
+            filename = "%s - %s.csv" % (payout_date, payout.payout_id)
+            with open(filename, "w", newline="") as f:
+                writer = csv.writer(f, **csv_options)
+                # Print header
+                writer.writerow(table._field_names)
+                # Print each row
+                for row in table._get_rows(options):
+                    writer.writerow(row)
+
 
     def compute_vat_per_country(self, from_datetime, until_datetime):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
