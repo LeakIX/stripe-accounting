@@ -1021,7 +1021,7 @@ class StripeAPI:
                 key: value for key, value in kwargs.items() if key not in options
             }
             payout_date = payout.created_datetime.strftime("%Y%m%d")
-            filename = "Payout %s - %s.csv" % (payout_date, payout.payout_id)
+            filename = "Payout %s - %s.xlsx" % (payout_date, payout.payout_id)
             with open(filename, "w", newline="") as f:
                 writer = csv.writer(f, **csv_options)
                 # Print header
