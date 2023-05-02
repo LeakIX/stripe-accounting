@@ -26,7 +26,37 @@ CN_PDF_OUTPUT_DIRECTORY = pathlib.Path(decouple.config("CN_PDF_OUTPUT_DIRECTORY"
 
 # From https://www.destatis.de/Europa/EN/Country/Country-Codes.html
 INTRACOM_COUNTRY_CODES = [
-    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LT", "LV", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "CH"
+    "AT",
+    "BE",
+    "BG",
+    "HR",
+    "CY",
+    "CZ",
+    "DK",
+    "EE",
+    "FI",
+    "FR",
+    "DE",
+    "GR",
+    "HU",
+    "IE",
+    "IT",
+    "LT",
+    "LV",
+    "LU",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SK",
+    "SI",
+    "ES",
+    "SE",
+    "IS",
+    "LI",
+    "NO",
+    "CH",
 ]
 
 
@@ -208,7 +238,10 @@ class PayoutItem:
     @property
     def related_accounting_account(self):
         if not self.related_invoice.customer.is_b2b():
-            if self.related_invoice.customer_address.country_code not in INTRACOM_COUNTRY_CODES:
+            if (
+                self.related_invoice.customer_address.country_code
+                not in INTRACOM_COUNTRY_CODES
+            ):
                 return "OSS EXTRACOM"
             else:
                 return "OSS %s" % self.related_invoice.customer_address.country
@@ -297,7 +330,7 @@ class Payout:
             "Related invoice",
             "Client email",
             "Client country",
-            "Related OSS accounting account"
+            "Related OSS accounting account",
         ]
         for i in items:
             if i.related_invoice is not None:
@@ -327,7 +360,7 @@ class Payout:
                         "",
                         "",
                         "",
-                        ""
+                        "",
                     ]
                 )
         return table
@@ -958,7 +991,9 @@ class StripeAPI:
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
         until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
-        payouts = Payout.retrieve(from_datetime=from_datetime_dt, until_datetime=until_datetime_dt)
+        payouts = Payout.retrieve(
+            from_datetime=from_datetime_dt, until_datetime=until_datetime_dt
+        )
         logging.info("Retrieved %d payouts", len(payouts))
         for payout in payouts:
             table = payout.as_prettytable()
@@ -973,7 +1008,9 @@ class StripeAPI:
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
         until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
-        payouts = Payout.retrieve(from_datetime=from_datetime_dt, until_datetime=until_datetime_dt)
+        payouts = Payout.retrieve(
+            from_datetime=from_datetime_dt, until_datetime=until_datetime_dt
+        )
         logging.info("Retrieved %d payouts", len(payouts))
         kwargs = {"delimiter": "\t"}
 
@@ -992,7 +1029,6 @@ class StripeAPI:
                 # Print each row
                 for row in table._get_rows(options):
                     writer.writerow(row)
-
 
     def compute_vat_per_country(self, from_datetime, until_datetime):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
@@ -1161,7 +1197,9 @@ class StripeAPI:
                 invoices_to_emit_cn.append(i)
         # Order by invoice number.
         invoices_to_emit_cn.sort(key=lambda i: i.number)
-        invoices_to_emit_cn = [d for d in invoices_to_emit_cn if d.number not in skipping_invoices_list]
+        invoices_to_emit_cn = [
+            d for d in invoices_to_emit_cn if d.number not in skipping_invoices_list
+        ]
         # take the year of the issued credit note date
         issued_date_credit_note_dt = datetime.datetime.strptime(
             issued_date_credit_note, "%Y-%m-%d"
