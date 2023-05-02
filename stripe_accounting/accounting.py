@@ -879,7 +879,7 @@ class StripeAPI:
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
-        until_datetime_dt = until_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
         invoices = Invoice.retrieve(
             from_datetime=from_datetime_dt, until_datetime=until_datetime_dt
         )
@@ -894,7 +894,7 @@ class StripeAPI:
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
-        until_datetime_dt = until_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
         payouts = Payout.retrieve(from_datetime_dt, until_datetime_dt)
         items = payouts[0].items
         table = PrettyTable()
@@ -948,7 +948,7 @@ class StripeAPI:
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
-        until_datetime_dt = until_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
         all_invoices = Invoice.retrieve(
             from_datetime=from_datetime_dt, until_datetime=until_datetime_dt
         )
@@ -1068,7 +1068,7 @@ class StripeAPI:
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
-        until_datetime_dt = until_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
         currency = CURRENCIES.get(currency_iso_code.upper())
         if currency is None:
             logging.error(f"Currency {currency_iso_code} is not supported")
