@@ -193,6 +193,9 @@ class PayoutItem:
     def is_charge(self):
         return self.raw["type"] == "charge"
 
+    def is_payment(self):
+        return self.raw["type"] == "payment"
+
     def is_adjustment(self):
         return self.raw["type"] == "adjustment"
 
@@ -205,7 +208,7 @@ class PayoutItem:
 
     @property
     def related_invoice(self):
-        if self.is_charge():
+        if self.is_charge() or self.is_payment():
             if self._related_invoice is None:
                 charge_id = self.raw["source"]
                 invoice = Invoice(
@@ -287,6 +290,10 @@ class Payout:
         return datetime.datetime.fromtimestamp(self.raw["created"])
 
     @property
+    def arrival_datetime(self):
+        return datetime.datetime.fromtimestamp(self.raw["arrival_date"])
+
+    @property
     def currency(self):
         return CURRENCIES.get(self.raw["currency"].upper())
 
@@ -314,7 +321,7 @@ class Payout:
             if has_more is True:
                 starting_after = raw_payouts[-1]["id"]
         return [
-            r for r in payouts if from_datetime <= r.created_datetime <= until_datetime
+            r for r in payouts if from_datetime <= r.arrival_datetime <= until_datetime
         ]
 
     def as_prettytable(self):
@@ -998,12 +1005,14 @@ class StripeAPI:
         for payout in payouts:
             table = payout.as_prettytable()
             print(
-                "Payout ID %s, executed on %s"
-                % (payout.payout_id, payout.created_datetime)
+                "Payout ID %s, received on %s"
+                % (payout.payout_id, payout.arrival_datetime)
             )
             print(table)
 
-    def export_payouts_as_csv(self, from_datetime: str, until_datetime: str):
+    def export_payouts(
+        self, from_datetime: str, until_datetime: str, output_extension: str
+    ):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
@@ -1020,8 +1029,12 @@ class StripeAPI:
             csv_options = {
                 key: value for key, value in kwargs.items() if key not in options
             }
-            payout_date = payout.created_datetime.strftime("%Y%m%d")
-            filename = "Payout %s - %s.xlsx" % (payout_date, payout.payout_id)
+            payout_date = payout.arrival_datetime.strftime("%Y%m%d")
+            filename = "Payout %s - %s.%s" % (
+                payout_date,
+                payout.payout_id,
+                output_extension,
+            )
             with open(filename, "w", newline="") as f:
                 writer = csv.writer(f, **csv_options)
                 # Print header
