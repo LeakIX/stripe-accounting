@@ -1,4 +1,5 @@
 import datetime
+import itertools
 import logging
 import os
 import pathlib
@@ -124,6 +125,12 @@ class Price:
             s += i
         return s
 
+    def abs(self):
+        if self.q >= Decimal("0"):
+            return self
+        else:
+            return Price(q=-self.q, currency=self.currency)
+
 
 class Dispute:
     def __init__(self, raw: dict):
@@ -177,6 +184,23 @@ class BalanceTransaction:
         self.raw = raw
 
 
+class VATReportItemCategory:
+    BILLING = "Billing Fees"
+    TAX_PRODUCT_FEES = "Tax Product Fees"
+    STRIPE_PROCESSING_FEES_CARD = "Stripe Processing Fees (card)"
+    STRIPE_PROCESSING_FEES_OTHER = "Stripe Processing Fees (other)"
+    RADAR_FRAUD_FEES = "Radar Stripe Fees"
+    REFUND_FOR_CHARGES = "Disputes"
+    CHARGEBACK_WITHDRAWAL = "Chargeback withdrawal"
+
+
+class VATReportItem:
+    def __init__(self, category: VATReportItemCategory, amount: Price, raw: dict):
+        self.category = category
+        self.amount = amount
+        self.raw = raw
+
+
 class PayoutItem:
     def __init__(self, raw: dict):
         self.raw = raw
@@ -185,6 +209,79 @@ class PayoutItem:
     @property
     def item_type(self):
         return self.raw["type"]
+
+    # VAT category
+    def is_billing_fees(self):
+        return self.raw["description"].startswith("Billing")
+
+    def is_tax_product_fees(self):
+        return self.raw["description"].startswith("Automatic Taxes")
+
+    def is_stripe_processing_fees_card(self):
+        return self.raw["description"].startswith("Subscription") and self.is_charge()
+
+    def is_stripe_processing_fees_other(self):
+        return self.raw["description"].startswith("Subscription") and self.is_payment()
+
+    def is_radar_fees(self):
+        return self.raw["description"].startswith("Radar")
+
+    def is_refund_fees(self):
+        return self.raw["description"].startswith("REFUND FOR CHARGE")
+
+    def is_chargeback_withdrawal_fees(self):
+        return self.raw["description"].startswith("Chargeback withdrawal")
+
+    def get_corresponding_vat_report_item(self):
+        if self.is_billing_fees():
+            return VATReportItem(
+                VATReportItemCategory.BILLING, self.gross_amount.abs(), self.raw
+            )
+
+        elif self.is_tax_product_fees():
+            return VATReportItem(
+                VATReportItemCategory.TAX_PRODUCT_FEES,
+                self.gross_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_stripe_processing_fees_card():
+            return VATReportItem(
+                VATReportItemCategory.STRIPE_PROCESSING_FEES_CARD,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_stripe_processing_fees_other():
+            return VATReportItem(
+                VATReportItemCategory.STRIPE_PROCESSING_FEES_OTHER,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_radar_fees():
+            return VATReportItem(
+                VATReportItemCategory.RADAR_FRAUD_FEES,
+                self.gross_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_refund_fees():
+            return VATReportItem(
+                VATReportItemCategory.REFUND_FOR_CHARGES,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_chargeback_withdrawal_fees():
+            return VATReportItem(
+                VATReportItemCategory.CHARGEBACK_WITHDRAWAL,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        else:
+            raise Exception("Cannot assign a VAT report category. Description is %s" % self.raw["description"])
 
     @property
     def description(self):
@@ -1042,6 +1139,35 @@ class StripeAPI:
                 # Print each row
                 for row in table._get_rows(options):
                     writer.writerow(row)
+
+    def make_detailled_vat_report(self, from_datetime: str, until_datetime: str):
+        from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
+        until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
+        from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
+        until_datetime_dt = until_datetime_dt.replace(hour=23, minute=59, second=59)
+        genesis = datetime.datetime.fromtimestamp(0)
+        today = datetime.datetime.today()
+        payouts = Payout.retrieve(from_datetime=genesis, until_datetime=today)
+        logging.info("Retrieved %d payouts", len(payouts))
+        payout_items = list(itertools.chain.from_iterable([p.items for p in payouts]))
+        payout_items = [
+            p
+            for p in payout_items
+            if from_datetime_dt <= p.created_datetime <= until_datetime_dt
+        ]
+        vat_report_items = [p.get_corresponding_vat_report_item() for p in payout_items]
+        vat_report_items_per_category = dict()
+        for i in vat_report_items:
+            if i.category in vat_report_items_per_category:
+                vat_report_items_per_category[i.category].append(i)
+            else:
+                vat_report_items_per_category[i.category] = [i]
+        table = PrettyTable()
+        table.field_names = ["Category", "Amount"]
+        for k, vs in vat_report_items_per_category.items():
+            table.add_row([k, Price.sum([v.amount for v in vs])])
+        print(table)
+        # print(vat_report_items_per_category)
 
     def compute_vat_per_country(self, from_datetime, until_datetime):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
