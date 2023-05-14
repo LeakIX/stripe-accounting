@@ -191,7 +191,7 @@ class VATReportItemCategory:
     STRIPE_PROCESSING_FEES_OTHER = "Stripe Processing Fees (other)"
     RADAR_FRAUD_FEES = "Radar Stripe Fees"
     REFUND_FOR_CHARGES = "Disputes"
-    CHARGEBACK_WITHDRAWAL = "Chargeback withdrawal"
+    CHARGEBACK_WITHDRAWAL = "Dispute Fees"
 
 
 class VATReportItem:
@@ -199,154 +199,6 @@ class VATReportItem:
         self.category = category
         self.amount = amount
         self.raw = raw
-
-
-class PayoutItem:
-    def __init__(self, raw: dict):
-        self.raw = raw
-        self._related_invoice = None
-
-    @property
-    def item_type(self):
-        return self.raw["type"]
-
-    # VAT category
-    def is_billing_fees(self):
-        return self.raw["description"].startswith("Billing")
-
-    def is_tax_product_fees(self):
-        return self.raw["description"].startswith("Automatic Taxes")
-
-    def is_stripe_processing_fees_card(self):
-        return self.raw["description"].startswith("Subscription") and self.is_charge()
-
-    def is_stripe_processing_fees_other(self):
-        return self.raw["description"].startswith("Subscription") and self.is_payment()
-
-    def is_radar_fees(self):
-        return self.raw["description"].startswith("Radar")
-
-    def is_refund_fees(self):
-        return self.raw["description"].startswith("REFUND FOR CHARGE")
-
-    def is_chargeback_withdrawal_fees(self):
-        return self.raw["description"].startswith("Chargeback withdrawal")
-
-    def get_corresponding_vat_report_item(self):
-        if self.is_billing_fees():
-            return VATReportItem(
-                VATReportItemCategory.BILLING, self.gross_amount.abs(), self.raw
-            )
-
-        elif self.is_tax_product_fees():
-            return VATReportItem(
-                VATReportItemCategory.TAX_PRODUCT_FEES,
-                self.gross_amount.abs(),
-                self.raw,
-            )
-
-        elif self.is_stripe_processing_fees_card():
-            return VATReportItem(
-                VATReportItemCategory.STRIPE_PROCESSING_FEES_CARD,
-                self.fee_amount.abs(),
-                self.raw,
-            )
-
-        elif self.is_stripe_processing_fees_other():
-            return VATReportItem(
-                VATReportItemCategory.STRIPE_PROCESSING_FEES_OTHER,
-                self.fee_amount.abs(),
-                self.raw,
-            )
-
-        elif self.is_radar_fees():
-            return VATReportItem(
-                VATReportItemCategory.RADAR_FRAUD_FEES,
-                self.gross_amount.abs(),
-                self.raw,
-            )
-
-        elif self.is_refund_fees():
-            return VATReportItem(
-                VATReportItemCategory.REFUND_FOR_CHARGES,
-                self.fee_amount.abs(),
-                self.raw,
-            )
-
-        elif self.is_chargeback_withdrawal_fees():
-            return VATReportItem(
-                VATReportItemCategory.CHARGEBACK_WITHDRAWAL,
-                self.fee_amount.abs(),
-                self.raw,
-            )
-
-        else:
-            raise Exception("Cannot assign a VAT report category. Description is %s" % self.raw["description"])
-
-    @property
-    def description(self):
-        return self.raw["description"]
-
-    def is_charge(self):
-        return self.raw["type"] == "charge"
-
-    def is_payment(self):
-        return self.raw["type"] == "payment"
-
-    def is_adjustment(self):
-        return self.raw["type"] == "adjustment"
-
-    def is_stripe_fee(self):
-        return self.raw["type"] == "stripe_fee"
-
-    @property
-    def created_datetime(self):
-        return datetime.datetime.fromtimestamp(self.raw["created"])
-
-    @property
-    def related_invoice(self):
-        if self.is_charge() or self.is_payment():
-            if self._related_invoice is None:
-                charge_id = self.raw["source"]
-                invoice = Invoice(
-                    stripe.Charge.retrieve(charge_id, expand=["invoice"])["invoice"]
-                )
-                self._related_invoice = invoice
-        return self._related_invoice
-
-    @property
-    def currency(self):
-        return CURRENCIES.get(self.raw["currency"].upper())
-
-    @property
-    def gross_amount(self):
-        q = Decimal(self.raw["amount"]) / 100
-        return Price(currency=self.currency, q=q)
-
-    @property
-    def net_amount(self):
-        q = Decimal(self.raw["net"]) / 100
-        return Price(currency=self.currency, q=q)
-
-    @property
-    def fee_amount(self):
-        gross_amount = Decimal(self.raw["amount"]) / 100
-        net_amount = Decimal(self.raw["net"]) / 100
-        q = gross_amount - net_amount
-        return Price(currency=self.currency, q=q)
-
-    @property
-    def related_accounting_account(self):
-        if not self.related_invoice.customer.is_b2b():
-            if (
-                self.related_invoice.customer_address.country_code
-                not in INTRACOM_COUNTRY_CODES
-            ):
-                return "OSS EXTRACOM"
-            else:
-                return "OSS %s" % self.related_invoice.customer_address.country
-        else:
-            return "%s" % self.related_invoice.customer_name
 
 
 class Payout:
@@ -367,7 +219,7 @@ class Payout:
                 has_more = raw_response["has_more"]
                 raw_items = raw_response["data"]
                 payout_items.extend(
-                    [PayoutItem(i) for i in raw_items if i["type"] != "payout"]
+                    [PayoutItem(i, self) for i in raw_items if i["type"] != "payout"]
                 )
                 if has_more is True:
                     starting_after = raw_items[-1]["id"]
@@ -468,6 +320,158 @@ class Payout:
                     ]
                 )
         return table
+
+
+class PayoutItem:
+    def __init__(self, raw: dict, payout: Payout):
+        self.raw = raw
+        self._related_invoice = None
+        self.payout = payout
+
+    @property
+    def item_type(self):
+        return self.raw["type"]
+
+    # VAT category
+    def is_billing_fees(self):
+        return self.raw["description"].startswith("Billing")
+
+    def is_tax_product_fees(self):
+        return self.raw["description"].startswith("Automatic Taxes")
+
+    def is_stripe_processing_fees_card(self):
+        return self.raw["description"].startswith("Subscription") and self.is_charge()
+
+    def is_stripe_processing_fees_other(self):
+        return self.raw["description"].startswith("Subscription") and self.is_payment()
+
+    def is_radar_fees(self):
+        return self.raw["description"].startswith("Radar")
+
+    def is_refund_fees(self):
+        return self.raw["description"].startswith("REFUND FOR CHARGE")
+
+    def is_chargeback_withdrawal_fees(self):
+        return self.raw["description"].startswith("Chargeback withdrawal")
+
+    def get_corresponding_vat_report_item(self):
+        if self.is_billing_fees():
+            return VATReportItem(
+                VATReportItemCategory.BILLING, self.gross_amount.abs(), self.raw
+            )
+
+        elif self.is_tax_product_fees():
+            return VATReportItem(
+                VATReportItemCategory.TAX_PRODUCT_FEES,
+                self.gross_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_stripe_processing_fees_card():
+            return VATReportItem(
+                VATReportItemCategory.STRIPE_PROCESSING_FEES_CARD,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_stripe_processing_fees_other():
+            return VATReportItem(
+                VATReportItemCategory.STRIPE_PROCESSING_FEES_OTHER,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_radar_fees():
+            return VATReportItem(
+                VATReportItemCategory.RADAR_FRAUD_FEES,
+                self.gross_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_refund_fees():
+            return VATReportItem(
+                VATReportItemCategory.REFUND_FOR_CHARGES,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_chargeback_withdrawal_fees():
+            return VATReportItem(
+                VATReportItemCategory.CHARGEBACK_WITHDRAWAL,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        else:
+            raise Exception(
+                "Cannot assign a VAT report category. Description is %s"
+                % self.raw["description"]
+            )
+
+    @property
+    def description(self):
+        return self.raw["description"]
+
+    def is_charge(self):
+        return self.raw["type"] == "charge"
+
+    def is_payment(self):
+        return self.raw["type"] == "payment"
+
+    def is_adjustment(self):
+        return self.raw["type"] == "adjustment"
+
+    def is_stripe_fee(self):
+        return self.raw["type"] == "stripe_fee"
+
+    @property
+    def created_datetime(self):
+        return datetime.datetime.fromtimestamp(self.raw["created"])
+
+    @property
+    def related_invoice(self):
+        if self.is_charge() or self.is_payment():
+            if self._related_invoice is None:
+                charge_id = self.raw["source"]
+                invoice = Invoice(
+                    stripe.Charge.retrieve(charge_id, expand=["invoice"])["invoice"]
+                )
+                self._related_invoice = invoice
+        return self._related_invoice
+
+    @property
+    def currency(self):
+        return CURRENCIES.get(self.raw["currency"].upper())
+
+    @property
+    def gross_amount(self):
+        q = Decimal(self.raw["amount"]) / 100
+        return Price(currency=self.currency, q=q)
+
+    @property
+    def net_amount(self):
+        q = Decimal(self.raw["net"]) / 100
+        return Price(currency=self.currency, q=q)
+
+    @property
+    def fee_amount(self):
+        gross_amount = Decimal(self.raw["amount"]) / 100
+        net_amount = Decimal(self.raw["net"]) / 100
+        q = gross_amount - net_amount
+        return Price(currency=self.currency, q=q)
+
+    @property
+    def related_accounting_account(self):
+        if not self.related_invoice.customer.is_b2b():
+            if (
+                self.related_invoice.customer_address.country_code
+                not in INTRACOM_COUNTRY_CODES
+            ):
+                return "OSS EXTRACOM"
+            else:
+                return "OSS %s" % self.related_invoice.customer_address.country
+        else:
+            return "%s" % self.related_invoice.customer_name
 
 
 class Payment:
@@ -1167,7 +1171,64 @@ class StripeAPI:
         for k, vs in vat_report_items_per_category.items():
             table.add_row([k, Price.sum([v.amount for v in vs])])
         print(table)
-        # print(vat_report_items_per_category)
+        table_monthly_items = PrettyTable()
+        table_monthly_items.field_names = [
+            "description",
+            "type",
+            "Gross amount",
+            "Net amount",
+            "Fee amount",
+            "Datetime",
+            "Related invoice",
+            "Client email",
+            "Client country",
+            "Related OSS accounting account",
+            "VAT Taxed amount",
+            "Tax Description",
+            "Payout ID",
+            "Payout datetime",
+        ]
+        for i in payout_items:
+            related_vat_category = i.get_corresponding_vat_report_item()
+            if i.related_invoice is not None:
+                table_monthly_items.add_row(
+                    [
+                        i.description,
+                        i.item_type,
+                        i.gross_amount,
+                        i.net_amount,
+                        i.fee_amount,
+                        i.created_datetime,
+                        i.related_invoice.number,
+                        i.related_invoice.customer.email,
+                        i.related_invoice.customer.address.country,
+                        i.related_accounting_account,
+                        related_vat_category.amount,
+                        related_vat_category.category,
+                        i.payout.payout_id,
+                        i.payout.arrival_datetime,
+                    ]
+                )
+            else:
+                table_monthly_items.add_row(
+                    [
+                        i.description,
+                        i.item_type,
+                        i.gross_amount,
+                        i.net_amount,
+                        i.fee_amount,
+                        i.created_datetime,
+                        "",
+                        "",
+                        "",
+                        "",
+                        related_vat_category.amount,
+                        related_vat_category.category,
+                        i.payout.payout_id,
+                        i.payout.arrival_datetime,
+                    ]
+                )
+        print(table_monthly_items)
 
     def compute_vat_per_country(self, from_datetime, until_datetime):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
