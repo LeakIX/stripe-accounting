@@ -1229,6 +1229,25 @@ class StripeAPI:
                     ]
                 )
         print(table_monthly_items)
+        kwargs = {"delimiter": "\t"}
+        options = table_monthly_items._get_options(kwargs)
+        csv_options = {
+            key: value for key, value in kwargs.items() if key not in options
+        }
+        payout_date_start = from_datetime_dt.strftime("%Y%m%d")
+        payout_date_end = until_datetime_dt.strftime("%Y%m%d")
+        filename = "Payout items from %s to %s.%s" % (
+            payout_date_start,
+            payout_date_end,
+            "csv",
+        )
+        with open(filename, "w", newline="") as f:
+            writer = csv.writer(f, **csv_options)
+            # Print header
+            writer.writerow(table_monthly_items._field_names)
+            # Print each row
+            for row in table_monthly_items._get_rows(options):
+                writer.writerow(row)
 
     def compute_vat_per_country(self, from_datetime, until_datetime):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
