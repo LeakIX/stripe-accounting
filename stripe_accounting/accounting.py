@@ -1144,7 +1144,7 @@ class StripeAPI:
                 for row in table._get_rows(options):
                     writer.writerow(row)
 
-    def make_detailled_vat_report(self, from_datetime: str, until_datetime: str):
+    def make_detailled_vat_report(self, from_datetime: str, until_datetime: str, output_extension: str):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
@@ -1239,7 +1239,7 @@ class StripeAPI:
         filename = "Payout items from %s to %s.%s" % (
             payout_date_start,
             payout_date_end,
-            "csv",
+            output_extension,
         )
         with open(filename, "w", newline="") as f:
             writer = csv.writer(f, **csv_options)
