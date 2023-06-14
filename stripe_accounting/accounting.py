@@ -190,6 +190,7 @@ class VATReportItemCategory:
     TAX_PRODUCT_FEES = "Tax Product Fees"
     STRIPE_PROCESSING_FEES_CARD = "Stripe Processing Fees (card)"
     STRIPE_PROCESSING_FEES_OTHER = "Stripe Processing Fees (other)"
+    SUBSCRIPTIONS_FEES = "Subscriptions fees"
     RADAR_FRAUD_FEES = "Radar Stripe Fees"
     REFUND_FOR_CHARGES = "Disputes"
     CHARGEBACK_WITHDRAWAL = "Dispute Fees"
@@ -342,10 +343,13 @@ class PayoutItem:
         return self.raw["description"].startswith("Automatic Taxes")
 
     def is_stripe_processing_fees_card(self):
-        return self.raw["description"].startswith("Subscription") and self.is_charge()
+        return self.raw["description"].startswith("Subscription update") and self.is_charge()
 
     def is_stripe_processing_fees_other(self):
-        return self.raw["description"].startswith("Subscription") and self.is_payment()
+        return self.raw["description"].startswith("Subscription update") and self.is_payment()
+
+    def is_stripe_subscription_fees(self):
+        return self.raw["description"].startswith("Subscription creation")
 
     def is_radar_fees(self):
         return self.raw["description"].startswith("Radar")
@@ -382,6 +386,13 @@ class PayoutItem:
         elif self.is_stripe_processing_fees_other():
             return VATReportItem(
                 VATReportItemCategory.STRIPE_PROCESSING_FEES_OTHER,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
+        elif self.is_stripe_subscription_fees():
+            return VATReportItem(
+                VATReportItemCategory.SUBSCRIPTIONS_FEES,
                 self.fee_amount.abs(),
                 self.raw,
             )
