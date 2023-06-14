@@ -13,6 +13,7 @@ import pycountry
 import stripe
 import wget
 import csv
+import pandas as pd
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -192,6 +193,7 @@ class VATReportItemCategory:
     RADAR_FRAUD_FEES = "Radar Stripe Fees"
     REFUND_FOR_CHARGES = "Disputes"
     CHARGEBACK_WITHDRAWAL = "Dispute Fees"
+    BANK_ACCOUNT = "Bank account"
 
 
 class VATReportItem:
@@ -351,6 +353,9 @@ class PayoutItem:
     def is_refund_fees(self):
         return self.raw["description"].startswith("REFUND FOR CHARGE")
 
+    def is_refund_payment(self):
+        return self.raw["description"].startswith("REFUND FOR PAYMENT")
+
     def is_chargeback_withdrawal_fees(self):
         return self.raw["description"].startswith("Chargeback withdrawal")
 
@@ -395,6 +400,13 @@ class PayoutItem:
                 self.raw,
             )
 
+        elif self.is_refund_payment():
+            return VATReportItem(
+                VATReportItemCategory.BANK_ACCOUNT,
+                self.fee_amount.abs(),
+                self.raw,
+            )
+
         elif self.is_chargeback_withdrawal_fees():
             return VATReportItem(
                 VATReportItemCategory.CHARGEBACK_WITHDRAWAL,
@@ -404,8 +416,13 @@ class PayoutItem:
 
         else:
             raise Exception(
-                "Cannot assign a VAT report category. Description is %s"
-                % self.raw["description"]
+                "Cannot assign a VAT report category. Description is %s, payout is %s (%s) and payout type is %s"
+                % (
+                    self.raw["description"],
+                    str(self.payout.payout_id),
+                    str(self.payout.arrival_datetime),
+                    self.payout.raw["type"],
+                )
             )
 
     @property
@@ -423,6 +440,9 @@ class PayoutItem:
 
     def is_stripe_fee(self):
         return self.raw["type"] == "stripe_fee"
+
+    def is_banking_account(self):
+        return self.raw["type"] == "bank_account"
 
     @property
     def created_datetime(self):
@@ -1122,7 +1142,7 @@ class StripeAPI:
             from_datetime=from_datetime_dt, until_datetime=until_datetime_dt
         )
         logging.info("Retrieved %d payouts", len(payouts))
-        kwargs = {"delimiter": "\t"}
+        kwargs = {"delimiter": ","}
 
         for payout in payouts:
             table = payout.as_prettytable()
@@ -1131,20 +1151,28 @@ class StripeAPI:
                 key: value for key, value in kwargs.items() if key not in options
             }
             payout_date = payout.arrival_datetime.strftime("%Y%m%d")
-            filename = "Payout %s - %s.%s" % (
-                payout_date,
-                payout.payout_id,
-                output_extension,
-            )
-            with open(filename, "w", newline="") as f:
+            csv_filename = "Payout %s - %s.%s" % (payout_date, payout.payout_id, "csv")
+
+            with open(csv_filename, "w", newline="") as f:
                 writer = csv.writer(f, **csv_options)
                 # Print header
                 writer.writerow(table._field_names)
                 # Print each row
                 for row in table._get_rows(options):
                     writer.writerow(row)
+            # Microsoft
+            if output_extension == "xlsx":
+                filename = "Payout %s - %s.%s" % (
+                    payout_date,
+                    payout.payout_id,
+                    output_extension,
+                )
+                read_file = pd.read_csv(csv_filename)
+                read_file.to_excel(filename, header=True)
 
-    def make_detailled_vat_report(self, from_datetime: str, until_datetime: str, output_extension: str):
+    def make_detailled_vat_report(
+        self, from_datetime: str, until_datetime: str, output_extension: str
+    ):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
         from_datetime_dt = from_datetime_dt.replace(hour=0, minute=0, second=0)
@@ -1229,25 +1257,34 @@ class StripeAPI:
                     ]
                 )
         print(table_monthly_items)
-        kwargs = {"delimiter": "\t"}
+        kwargs = {"delimiter": ","}
         options = table_monthly_items._get_options(kwargs)
         csv_options = {
             key: value for key, value in kwargs.items() if key not in options
         }
         payout_date_start = from_datetime_dt.strftime("%Y%m%d")
         payout_date_end = until_datetime_dt.strftime("%Y%m%d")
-        filename = "Payout items from %s to %s.%s" % (
+        csv_filename = "VAT detailed report - Payout items from %s to %s.csv" % (
             payout_date_start,
             payout_date_end,
-            output_extension,
         )
-        with open(filename, "w", newline="") as f:
+        with open(csv_filename, "w", newline="") as f:
             writer = csv.writer(f, **csv_options)
             # Print header
             writer.writerow(table_monthly_items._field_names)
             # Print each row
             for row in table_monthly_items._get_rows(options):
                 writer.writerow(row)
+        # Microsoft
+        if output_extension == "xlsx":
+            xlsx_filename = "VAT detailed report - Payout items from %s to %s.%s" % (
+                payout_date_start,
+                payout_date_end,
+                "xlsx",
+            )
+            read_file = pd.read_csv(csv_filename)
+            print(read_file)
+            read_file.to_excel(xlsx_filename, header=True)
 
     def compute_vat_per_country(self, from_datetime, until_datetime):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")

@@ -132,3 +132,4 @@ cn-pdf
 download
 *.csv
 *~lock*
+*.xlsx

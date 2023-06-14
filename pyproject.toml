@@ -18,6 +18,8 @@ fire = "*"
 pycountry = "*"
 jinja2 = "*"
 prettytable = "*"
+pandas = "*"
+openpyxl = "*"
 
 [tool.poetry.dev-dependencies]
 black = "*"
