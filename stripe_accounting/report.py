@@ -13,18 +13,16 @@ class AbstractReport(metaclass=ABCMeta):
 
 
 class SubscriptionCanceledReport(AbstractReport):
-    def __init__(self, customer_email: str, datetime: datetime.datetime, link: str):
+    def __init__(self, customer_email: str, datetime: datetime.datetime):
         self.customer_email = customer_email
         self.datetime = datetime
-        self.link = link
 
     def make(self) -> List[str]:
         return [
-            "Customer %s has canceled the subscription on %s, see %s"
+            "Customer %s has canceled the subscription on %s"
             % (
                 self.customer_email,
                 self.datetime.strftime("%Y-%m-%d %H:%M:%S"),
-                self.link,
             )
         ]
 

@@ -1597,7 +1597,7 @@ class StripeAPI:
 
     def published_canceled_subscription(self, platform: str):
         events = Event.retrieve_canceled_subscription()
-        reports = [SubscriptionCanceledReport(e.customer.email, e.canceled_at, "") for e in events]
+        reports = [SubscriptionCanceledReport(e.customer.email, e.canceled_at) for e in events]
         platform = get_reporting_platform(platform)
         for r in reports:
             platform.post(report=r)
