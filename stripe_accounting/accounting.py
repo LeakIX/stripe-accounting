@@ -15,6 +15,7 @@ import wget
 import csv
 import pandas as pd
 import enum
+from report import Mattermost, SubscriptionCanceledReport, Stdin, AVAILABLE_REPORTING_PLATFORMS
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -61,6 +62,19 @@ INTRACOM_COUNTRY_CODES = [
     "NO",
     "CH",
 ]
+
+
+def get_reporting_platform(reporting_platform_name: str):
+    ReportingPlatform = AVAILABLE_REPORTING_PLATFORMS.get(reporting_platform_name)
+    if ReportingPlatform is None:
+        available_middlewares = ", ".join(AVAILABLE_REPORTING_PLATFORMS.keys())
+        raise Exception(
+            f"{reporting_platform_name} is not a valid reporting_platform. Available reporting platforms are f{available_middlewares}"
+        )
+    reporting_platform_config = {
+        k: decouple.config(k) for k in ReportingPlatform.CONFIGURATION_KEYS
+    }
+    return ReportingPlatform(**reporting_platform_config)
 
 
 def create_directories():
@@ -1581,13 +1595,12 @@ class StripeAPI:
             os.system(" ".join(cmd))
             index_cn = index_cn + 1
 
-    def get_last_canceled_subscription(self):
+    def published_canceled_subscription(self, platform: str):
         events = Event.retrieve_canceled_subscription()
-        for e in events:
-            print(
-                "Customer %s has canceled the subscription on %s"
-                % (e.customer.email, e.canceled_at.strftime("%Y-%m-%d %H:%M:%S"))
-            )
+        reports = [SubscriptionCanceledReport(e.customer.email, e.canceled_at, "") for e in events]
+        platform = get_reporting_platform(platform)
+        for r in reports:
+            platform.post(report=r)
 
 
 if __name__ == "__main__":
