@@ -15,7 +15,13 @@ import wget
 import csv
 import pandas as pd
 import enum
-from report import Mattermost, SubscriptionCanceledReport, Stdin, AVAILABLE_REPORTING_PLATFORMS
+from report import (
+    Mattermost,
+    SubscriptionCanceledReport,
+    Stdin,
+    AVAILABLE_REPORTING_PLATFORMS,
+    SubscriptionCreatedReport,
+)
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -788,6 +794,8 @@ class EventType(enum.Enum):
     CUSTOMER_SUBSCRIPTION_UPDATED = "customer.subscription.updated"
     INVOICE_CREATED = "invoice.created"
     CUSTOMER_SUBSCRIPTION_DELETED = "customer.subscription.deleted"
+    CUSTOMER_SUBSCRIPTION_PAUSED = "customer.subscription.paused"
+    CUSTOMER_SUBSCRIPTION_CREATED = "customer.subscription.created"
 
     @classmethod
     def from_str_opt(cls, s) -> Optional["EventType"]:
@@ -816,6 +824,10 @@ class Event:
         return EventType.from_str_exn(self.raw["type"])
 
     @property
+    def datetime(self):
+        return datetime.datetime.fromtimestamp(self.raw["created"])
+
+    @property
     def canceled_at(self):
         return datetime.datetime.fromtimestamp(
             self.raw["data"]["object"]["canceled_at"]
@@ -830,9 +842,24 @@ class Event:
         return self.event_type_exn in [EventType.CUSTOMER_SUBSCRIPTION_UPDATED]
 
     @classmethod
+    def retrieve_new_subscription(cls):
+        events = stripe.Event.list(
+            type=EventType.CUSTOMER_SUBSCRIPTION_CREATED.value, limit=100
+        )
+        events = [cls(e) for e in events["data"]]
+        return events
+
+    @classmethod
     def retrieve_canceled_subscription(cls):
-        events = stripe.Event.list(type=EventType.CUSTOMER_SUBSCRIPTION_DELETED.value)
-        return [cls(e) for e in events["data"]]
+        events_deleted = stripe.Event.list(
+            type=EventType.CUSTOMER_SUBSCRIPTION_DELETED.value, limit=100
+        )
+        events_deleted = [cls(e) for e in events_deleted["data"]]
+        events_canceled = stripe.Event.list(
+            type=EventType.CUSTOMER_SUBSCRIPTION_PAUSED.value, limit=100
+        )
+        events_canceled = [cls(e) for e in events_canceled["data"]]
+        return events_canceled + events_deleted
 
 
 class MadeUpCreditNote:
@@ -1595,9 +1622,20 @@ class StripeAPI:
             os.system(" ".join(cmd))
             index_cn = index_cn + 1
 
-    def published_canceled_subscription(self, platform: str):
+    def publish_canceled_subscription(self, platform: str):
         events = Event.retrieve_canceled_subscription()
-        reports = [SubscriptionCanceledReport(e.customer.email, e.canceled_at) for e in events]
+        reports = [
+            SubscriptionCanceledReport(e.customer.email, e.datetime) for e in events
+        ]
+        platform = get_reporting_platform(platform)
+        for r in reports:
+            platform.post(report=r)
+
+    def publish_new_subscription(self, platform: str):
+        events = Event.retrieve_new_subscription()
+        reports = [
+            SubscriptionCreatedReport(e.customer.email, e.datetime) for e in events
+        ]
         platform = get_reporting_platform(platform)
         for r in reports:
             platform.post(report=r)

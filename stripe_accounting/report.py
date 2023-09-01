@@ -27,6 +27,21 @@ class SubscriptionCanceledReport(AbstractReport):
         ]
 
 
+class SubscriptionCreatedReport(AbstractReport):
+    def __init__(self, customer_email: str, datetime: datetime.datetime):
+        self.customer_email = customer_email
+        self.datetime = datetime
+
+    def make(self) -> List[str]:
+        return [
+            "New subscription: customer %s on %s"
+            % (
+                self.customer_email,
+                self.datetime.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+        ]
+
+
 class AbstractReportingPlatform(metaclass=ABCMeta):
     NAME = None
 
