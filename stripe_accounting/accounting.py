@@ -14,6 +14,7 @@ import stripe
 import wget
 import csv
 import pandas as pd
+import enum
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -706,6 +707,17 @@ class Customer:
         return self.address.country_code == "BE"
 
     @classmethod
+    def retrieve_by_id(cls, customer_id):
+        customer = stripe.Customer.retrieve(customer_id)
+        address_info = customer["address"]
+        address_info["country_code"] = address_info["country"]
+        del address_info["country"]
+        address = Address(**address_info)
+        return Customer(
+            address=address, name=customer["name"], email=customer["email"], vat=None
+        )
+
+    @classmethod
     def retrieve(cls):
         """
         TODO: add pagination
@@ -748,6 +760,65 @@ class INVOICE_STATUS:
     PAID = "paid"
     VOID = "void"
     OPEN = "open"
+
+
+class EventType(enum.Enum):
+    INVOICE_UPCOMING = "invoice.upcoming"
+    INVOICE_FINALIZED = "invoice.finalized"
+    INVOICE_PAID = "invoice.paid"
+    INVOICE_UPDATED = "invoice.updated"
+    INVOICE_PAYMENT_SUCCEEDED = "invoice.payment_succeeded"
+    PAYMENT_INTENT_CREATED = "payment_intent.created"
+    PAYMENT_INTENT_SUCCEEDED = "payment_intent.succeeded"
+    CHARGE_SUCCEEDED = "charge.succeeded"
+    CUSTOMER_SUBSCRIPTION_UPDATED = "customer.subscription.updated"
+    INVOICE_CREATED = "invoice.created"
+    CUSTOMER_SUBSCRIPTION_DELETED = "customer.subscription.deleted"
+
+    @classmethod
+    def from_str_opt(cls, s) -> Optional["EventType"]:
+        return cls._value2member_map_.get(s)
+
+    @classmethod
+    def from_str_exn(cls, s) -> Optional["EventType"]:
+        return cls._value2member_map_[s]
+
+
+class Event:
+    def __init__(self, raw):
+        self.raw = raw
+
+    @property
+    def customer(self):
+        customer = Customer.retrieve_by_id(self.raw["data"]["object"]["customer"])
+        return customer
+
+    @property
+    def event_type_opt(self):
+        return EventType.from_str_opt(self.raw["type"])
+
+    @property
+    def event_type_exn(self):
+        return EventType.from_str_exn(self.raw["type"])
+
+    @property
+    def canceled_at(self):
+        return datetime.datetime.fromtimestamp(
+            self.raw["data"]["object"]["canceled_at"]
+        )
+
+    @classmethod
+    def retrieve(cls):
+        events = stripe.Event.list()
+        return [cls(e) for e in events["data"]]
+
+    def is_customer_subscription(self):
+        return self.event_type_exn in [EventType.CUSTOMER_SUBSCRIPTION_UPDATED]
+
+    @classmethod
+    def retrieve_canceled_subscription(cls):
+        events = stripe.Event.list(type=EventType.CUSTOMER_SUBSCRIPTION_DELETED.value)
+        return [cls(e) for e in events["data"]]
 
 
 class MadeUpCreditNote:
@@ -1509,6 +1580,14 @@ class StripeAPI:
             ]
             os.system(" ".join(cmd))
             index_cn = index_cn + 1
+
+    def get_last_canceled_subscription(self):
+        events = Event.retrieve_canceled_subscription()
+        for e in events:
+            print(
+                "Customer %s has canceled the subscription on %s"
+                % (e.customer.email, e.canceled_at.strftime("%Y-%m-%d %H:%M:%S"))
+            )
 
 
 if __name__ == "__main__":
