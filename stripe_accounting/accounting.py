@@ -24,7 +24,8 @@ from report import (
 )
 
 from jinja2 import Environment, FileSystemLoader
-
+from multiprocessing import cpu_count
+from multiprocessing.pool import ThreadPool
 
 logging.basicConfig(encoding="utf-8", level=logging.INFO)
 
@@ -1223,8 +1224,13 @@ class StripeAPI:
             "Retrieved %d invoices between %s and %s"
             % (len(invoices), from_datetime_dt, until_datetime_dt)
         )
-        for i in invoices:
+        def download(i):
             i.download()
+        cpus = cpu_count()
+        results = ThreadPool(cpus - 1).imap_unordered(download, invoices)
+        for r in results:
+            print("Downloaded")
+
 
     def print_payouts(self, from_datetime: str, until_datetime: str):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
