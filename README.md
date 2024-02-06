@@ -66,3 +66,23 @@ poetry run python \
   --issued-date-credit-note 2023-03-31 \ # Date to use for the credit note issuance
   --skipping-invoices "" # Invoice ids to skip
 ```
+
+### Create VAT detailled report
+
+```
+poetry run python stripe_accounting/accounting.py make_detailled_vat_report \
+  --from-datetime 2023-07-01 \
+  --until-datetime 2023-07-31 \
+  --output-extension xlsx
+```
+
+### Create detailled payout report
+
+Links every invoice with a payout, include fees, country, client, etc.
+
+```
+poetry run python stripe_accounting/accounting.py export_payout \
+  --from-datetime 2023-07-01 \
+  --until-datetime 2023-07-31 \
+  --output-extension xlsx
+```
