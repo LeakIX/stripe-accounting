@@ -123,9 +123,9 @@ class Price:
         if self.q >= 1000 and self.q < 1000000:
             f = str(self.q // 1000)
             s = self.q % 1000
-            return "%s%s,%.2f" % (self.currency.monetary_symbol, f, s)
+            return "%s,%.2f" % (f, s)
         else:
-            return "%s%.2f" % (self.currency.monetary_symbol, self.q)
+            return "%.2f" % self.q
 
     def __eq__(self, other):
         return self.q == other.q and self.currency == other.currency
@@ -1224,13 +1224,14 @@ class StripeAPI:
             "Retrieved %d invoices between %s and %s"
             % (len(invoices), from_datetime_dt, until_datetime_dt)
         )
+
         def download(i):
             i.download()
+
         cpus = cpu_count()
         results = ThreadPool(cpus - 1).imap_unordered(download, invoices)
         for r in results:
             print("Downloaded")
-
 
     def print_payouts(self, from_datetime: str, until_datetime: str):
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
