@@ -103,6 +103,23 @@ poetry run python stripe_accounting/accounting.py emit-credit-notes \
   --skipping-invoices ""
 ```
 
+#### Skipping Invoices
+
+The `--skipping-invoices` parameter supports flexible invoice exclusion with both individual invoices and ranges:
+
+```bash
+# Skip individual invoices
+--skipping-invoices "25001-0001,25001-0005"
+
+# Skip ranges (inclusive)
+--skipping-invoices "25001-0010:25001-0020"
+
+# Mix individual invoices and ranges
+--skipping-invoices "25001-0001,25001-0010:25001-0020,25001-0030"
+```
+
+**Range Format**: `PREFIX-NNNN:PREFIX-NNNN` where both invoices must have the same prefix (e.g., `25001-0010:25001-0020` includes invoices 0010 through 0020).
+
 ### Create VAT detailed report
 
 Using Make:

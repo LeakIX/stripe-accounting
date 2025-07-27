@@ -19,7 +19,24 @@ clean: ## Clean generated files and cache
 	@rm -rf cn-pdf cn-html
 
 .PHONY: dev-check
-dev-check: format lint test ## Run all development checks
+dev-check: format lint test fix-trailing-whitespace ## Run all development checks
+
+.PHONY: fix-trailing-whitespace
+fix-trailing-whitespace: ## Fix trailing whitespaces in source files
+	@find . -type f \( \
+		-name "*.py" -o -name "*.md" -o -name "*.yml" -o -name "*.yaml" \
+		-o -name "*.toml" -o -name "*.json" -o -name "*.txt" \
+		-o -name "*.sh" -o -name "*.env" -o -name "*.html" \
+		-o -name "*.css" -o -name "*.js" -o -name "Makefile" \
+	\) \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.git/*" \
+		-not -path "./node_modules/*" \
+		-not -path "./__pycache__/*" \
+		-not -path "./.pytest_cache/*" \
+		-not -path "./.mypy_cache/*" \
+		-exec sed -i'' -e "s/[[:space:]]*$$//" {} +
 
 .PHONY: format
 format: ## Format code with black
@@ -50,7 +67,8 @@ update: ## Update dependencies to latest versions
 .PHONY: download-invoices
 download-invoices: ## Download invoices (requires FROM_DATE and TO_DATE)
 	@if [ -z "$(FROM_DATE)" ] || [ -z "$(TO_DATE)" ]; then \
-		echo "Usage: make download-invoices FROM_DATE=2023-03-01 TO_DATE=2023-03-31"; \
+		echo "Usage: make download-invoices FROM_DATE=2023-03-01" \
+		     " TO_DATE=2023-03-31"; \
 		exit 1; \
 	fi
 	@poetry run python stripe_accounting/accounting.py download-invoices \
@@ -61,8 +79,10 @@ download-invoices: ## Download invoices (requires FROM_DATE and TO_DATE)
 emit-credit-notes: ## Emit credit notes (requires FROM_DATE, TO_DATE, INDEX, CURRENCY, ISSUE_DATE)
 	@if [ -z "$(FROM_DATE)" ] || [ -z "$(TO_DATE)" ] || [ -z "$(INDEX)" ] || \
 	   [ -z "$(CURRENCY)" ] || [ -z "$(ISSUE_DATE)" ]; then \
-		echo "Usage: make emit-credit-notes FROM_DATE=2023-03-01 TO_DATE=2023-03-31 \\"; \
-		echo "       INDEX=3 CURRENCY=eur ISSUE_DATE=2023-03-31 [INCLUDE_OPEN=1]"; \
+		echo "Usage: make emit-credit-notes FROM_DATE=2023-03-01" \
+		     " TO_DATE=2023-03-31 \\"; \
+		echo "       INDEX=3 CURRENCY=eur ISSUE_DATE=2023-03-31" \
+		     " [INCLUDE_OPEN=1]"; \
 		exit 1; \
 	fi
 	@poetry run python stripe_accounting/accounting.py emit-credit-notes \
@@ -77,7 +97,8 @@ emit-credit-notes: ## Emit credit notes (requires FROM_DATE, TO_DATE, INDEX, CUR
 .PHONY: payout-report
 payout-report: ## Generate payout report (requires FROM_DATE, TO_DATE)
 	@if [ -z "$(FROM_DATE)" ] || [ -z "$(TO_DATE)" ]; then \
-		echo "Usage: make payout-report FROM_DATE=2023-07-01 TO_DATE=2023-07-31 [FORMAT=xlsx]"; \
+		echo "Usage: make payout-report FROM_DATE=2023-07-01" \
+		     " TO_DATE=2023-07-31 [FORMAT=xlsx]"; \
 		exit 1; \
 	fi
 	poetry run python stripe_accounting/accounting.py export_payout \
@@ -88,7 +109,8 @@ payout-report: ## Generate payout report (requires FROM_DATE, TO_DATE)
 .PHONY: vat-report
 vat-report: ## Generate detailed VAT report (requires FROM_DATE, TO_DATE)
 	@if [ -z "$(FROM_DATE)" ] || [ -z "$(TO_DATE)" ]; then \
-		echo "Usage: make vat-report FROM_DATE=2023-07-01 TO_DATE=2023-07-31 [FORMAT=xlsx]"; \
+		echo "Usage: make vat-report FROM_DATE=2023-07-01" \
+		     " TO_DATE=2023-07-31 [FORMAT=xlsx]"; \
 		exit 1; \
 	fi
 	poetry run python stripe_accounting/accounting.py make_detailled_vat_report \

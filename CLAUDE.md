@@ -50,6 +50,18 @@ poetry run python stripe_accounting/accounting.py download-invoices --from-datet
 poetry run python stripe_accounting/accounting.py emit-credit-notes --from-datetime 2023-03-01 --until-datetime 2023-03-31 --first-index-cn 3 --currency-iso-code eur --include-open 1 --issued-date-credit-note 2023-03-31
 ```
 
+To skip specific invoices, use the `--skipping-invoices` parameter with comma-separated values. Supports ranges:
+```bash
+# Skip single invoices
+--skipping-invoices "25001-0001,25001-0005"
+
+# Skip ranges (inclusive)
+--skipping-invoices "25001-0010:25001-0020"
+
+# Mixed: single invoices and ranges
+--skipping-invoices "25001-0001,25001-0010:25001-0020,25001-0030"
+```
+
 ### Generate VAT reports
 ```bash
 poetry run python stripe_accounting/accounting.py make_detailled_vat_report --from-datetime 2023-07-01 --until-datetime 2023-07-31 --output-extension xlsx

@@ -1525,6 +1525,13 @@ class StripeAPI:
         - include refunded invoices (example: S23001-0056). There should be an overlap with the stripe emitted CN but we
           might have forgotten to emit a credit note when refunding.
         - include lost disputes
+
+        Args:
+            skipping_invoices: Comma-separated list of invoice numbers to skip. Supports ranges using colon notation.
+                Examples:
+                - Single invoices: "25001-0001,25001-0005"
+                - Ranges: "25001-0010:25001-0020" (includes invoices 0010 through 0020)
+                - Mixed: "25001-0001,25001-0010:25001-0020,25001-0030"
         """
         from_datetime_dt = datetime.datetime.strptime(from_datetime, "%Y-%m-%d")
         until_datetime_dt = datetime.datetime.strptime(until_datetime, "%Y-%m-%d")
@@ -1552,9 +1559,47 @@ class StripeAPI:
         # emitted credit notes as Stripe does not allow to emit credit note for these invoices on the interface nor the
         # API.
         include_open = include_open != 0
-        skipping_invoices_list = (
-            [] if skipping_invoices is None else skipping_invoices.split(",")
-        )
+        skipping_invoices_list = []
+        if skipping_invoices is not None:
+            for item in skipping_invoices.split(","):
+                item = item.strip()
+                if ":" in item:
+                    # Handle range: e.g., "25001-0010:25001-0020"
+                    start_invoice, end_invoice = item.split(":", 1)
+                    start_invoice = start_invoice.strip()
+                    end_invoice = end_invoice.strip()
+
+                    # Parse invoice numbers to extract the numeric part for range expansion
+                    try:
+                        # Extract parts: "25001-0010" -> prefix="25001", start_num=10
+                        start_parts = start_invoice.split("-")
+                        end_parts = end_invoice.split("-")
+
+                        if len(start_parts) != 2 or len(end_parts) != 2:
+                            raise ValueError("Invalid format")
+
+                        start_prefix = start_parts[0]
+                        end_prefix = end_parts[0]
+                        start_num = int(start_parts[1])
+                        end_num = int(end_parts[1])
+
+                        # Ensure both invoices have the same prefix
+                        if start_prefix != end_prefix:
+                            raise ValueError("Range must have same prefix")
+
+                        # Generate all invoice numbers in the range (inclusive)
+                        for num in range(start_num, end_num + 1):
+                            skipping_invoices_list.append(f"{start_prefix}-{num:04d}")
+
+                    except (ValueError, IndexError):
+                        logging.warning(
+                            f"Invalid invoice range format: {item}. Expected format: PREFIX-NNNN:PREFIX-NNNN"
+                        )
+                        # Add the original item if parsing fails
+                        skipping_invoices_list.append(item)
+                else:
+                    # Handle single invoice
+                    skipping_invoices_list.append(item)
         logging.info(f"Skipping invoices {skipping_invoices}")
         invoices = Invoice.retrieve(from_datetime_dt, until_datetime_dt)
         void_invoices = [
