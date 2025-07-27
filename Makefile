@@ -12,38 +12,39 @@ help: ## Show this help message
 # Development targets (alphabetical order)
 .PHONY: clean
 clean: ## Clean generated files and cache
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -delete
-	find . -type d -name ".pytest_cache" -delete
-	find . -type d -name ".mypy_cache" -delete
+	@find . -type f -name "*.pyc" -delete
+	@find . -type d -name "__pycache__" -delete
+	@find . -type d -name ".pytest_cache" -delete
+	@find . -type d -name ".mypy_cache" -delete
+	@rm -rf cn-pdf cn-html
 
 .PHONY: dev-check
 dev-check: format lint test ## Run all development checks
 
 .PHONY: format
 format: ## Format code with black
-	poetry run black .
+	@poetry run black .
 
 .PHONY: install
 install: ## Install dependencies using poetry
-	poetry install
+	@poetry install
 
 .PHONY: lint
 lint: ## Run linting checks
-	poetry run black --check .
-	poetry run mypy stripe_accounting/
+	@poetry run black --check .
+	@poetry run mypy stripe_accounting/
 
 .PHONY: test
 test: ## Run tests
-	poetry run pytest stripe_accounting/test_accounting.py -v
+	@poetry run pytest stripe_accounting/test_accounting.py -v
 
 .PHONY: type-check
 type-check: ## Run type checking with mypy
-	poetry run mypy stripe_accounting/
+	@poetry run mypy stripe_accounting/
 
 .PHONY: update
 update: ## Update dependencies to latest versions
-	poetry update
+	@poetry update
 
 # CLI wrapper targets (alphabetical order)
 .PHONY: download-invoices
@@ -52,7 +53,7 @@ download-invoices: ## Download invoices (requires FROM_DATE and TO_DATE)
 		echo "Usage: make download-invoices FROM_DATE=2023-03-01 TO_DATE=2023-03-31"; \
 		exit 1; \
 	fi
-	poetry run python stripe_accounting/accounting.py download-invoices \
+	@poetry run python stripe_accounting/accounting.py download-invoices \
 		--from-datetime $(FROM_DATE) \
 		--until-datetime $(TO_DATE)
 
@@ -64,7 +65,7 @@ emit-credit-notes: ## Emit credit notes (requires FROM_DATE, TO_DATE, INDEX, CUR
 		echo "       INDEX=3 CURRENCY=eur ISSUE_DATE=2023-03-31 [INCLUDE_OPEN=1]"; \
 		exit 1; \
 	fi
-	poetry run python stripe_accounting/accounting.py emit-credit-notes \
+	@poetry run python stripe_accounting/accounting.py emit-credit-notes \
 		--from-datetime $(FROM_DATE) \
 		--until-datetime $(TO_DATE) \
 		--first-index-cn $(INDEX) \
