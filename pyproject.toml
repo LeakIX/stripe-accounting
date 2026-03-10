@@ -21,7 +21,7 @@ prettytable = "*"
 pandas = "*"
 openpyxl = "*"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 black = "*"
 pytest = "*"
 mypy = "*"
